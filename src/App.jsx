@@ -619,40 +619,139 @@ function Aglomeraciones() {
         )}
       </section>
 
-      <section className="step">
-        <div className="step-head">
-          <span className="step-num">3</span>
-          <div>
-            <h2>Historial de análisis</h2>
-            <p className="step-desc">Consulta los análisis previos almacenados.</p>
+      <section className="step history-section">
+        <div className="section-toolbar">
+          <div className="step-head compact">
+            <span className="step-num">3</span>
+            <div>
+              <h2>Registro de resultados</h2>
+              <p className="step-desc">
+                Consulta los análisis realizados, el nivel final detectado y las métricas principales del monitoreo.
+              </p>
+            </div>
+          </div>
+
+          <button className="btn-ghost" onClick={cargarHistorial}>
+            Actualizar historial
+          </button>
+        </div>
+
+        <div className="history-summary">
+          <div className="summary-card">
+            <span className="summary-label">Análisis cargados</span>
+            <strong>{historial.length}</strong>
+            <small>Registros disponibles en pantalla</small>
+          </div>
+
+          <div className="summary-card">
+            <span className="summary-label">Nivel alto</span>
+            <strong>
+              {
+                historial.filter(
+                  (item) => String(item.nivel_final || "").toLowerCase() === "alto"
+                ).length
+              }
+            </strong>
+            <small>Eventos con mayor prioridad</small>
+          </div>
+
+          <div className="summary-card">
+            <span className="summary-label">Personas máximas</span>
+            <strong>
+              {
+                historial.length > 0
+                  ? Math.max(...historial.map((item) => item.personas_maximas || 0))
+                  : 0
+              }
+            </strong>
+            <small>Mayor conteo registrado</small>
           </div>
         </div>
-        <div className="step-body">
-          <button className="btn-ghost" onClick={cargarHistorial}>Cargar historial</button>
-          {historial.length > 0 && (
-            <div className="tabla-contenedor">
-              <table>
+
+        {historial.length === 0 ? (
+          <div className="history-empty">
+            <div className="history-empty-icon">↻</div>
+            <h3>No hay historial cargado</h3>
+            <p>
+              Presiona “Actualizar historial” para consultar los análisis almacenados en el servidor.
+            </p>
+            <button className="btn-primary" onClick={cargarHistorial}>
+              Cargar historial
+            </button>
+          </div>
+        ) : (
+          <div className="history-table-card">
+            <div className="history-table-head">
+              <div>
+                <span>Historial</span>
+                <h3>Últimos análisis registrados</h3>
+              </div>
+
+              <div className="history-count">
+                {historial.length} {historial.length === 1 ? "registro" : "registros"}
+              </div>
+            </div>
+
+            <div className="tabla-contenedor history-table-wrap">
+              <table className="history-table">
                 <thead>
                   <tr>
-                    <th>Video</th><th>Pasillo</th><th>Personas máx.</th><th>Grupo mayor</th><th>Nivel</th><th>Fecha</th>
+                    <th>Video</th>
+                    <th>Pasillo</th>
+                    <th>Personas máx.</th>
+                    <th>Grupo mayor</th>
+                    <th>Nivel</th>
+                    <th>Fecha</th>
                   </tr>
                 </thead>
+
                 <tbody>
-                  {historial.map((item) => (
-                    <tr key={item.id}>
-                      <td>{item.nombre_video}</td>
-                      <td>{item.preset_nombre || "—"}</td>
-                      <td>{item.personas_maximas}</td>
-                      <td>{item.grupo_mayor_maximo}</td>
-                      <td><span className={`badge ${item.nivel_final.toLowerCase()}`}>{item.nivel_final}</span></td>
-                      <td>{new Date(item.fecha).toLocaleString()}</td>
-                    </tr>
-                  ))}
+                  {historial.map((item) => {
+                    const nivel = item.nivel_final || "Sin datos";
+                    const nivelClase = String(nivel).toLowerCase().replaceAll(" ", "-");
+
+                    return (
+                      <tr key={item.id}>
+                        <td>
+                          <div className="history-video-name">
+                            <strong>{item.nombre_video}</strong>
+                            <span>Archivo analizado</span>
+                          </div>
+                        </td>
+
+                        <td>{item.preset_nombre || "—"}</td>
+
+                        <td>
+                          <span className="metric-pill metric-pill-strong">
+                            {item.personas_maximas ?? 0}
+                          </span>
+                        </td>
+
+                        <td>
+                          <span className="metric-pill">
+                            {item.grupo_mayor_maximo ?? 0}
+                          </span>
+                        </td>
+
+                        <td>
+                          <span className={`badge ${nivelClase}`}>
+                            {nivel}
+                          </span>
+                        </td>
+
+                        <td>
+                          <span className="history-date">
+                            {item.fecha ? new Date(item.fecha).toLocaleString() : "—"}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </section>
     </>
   );

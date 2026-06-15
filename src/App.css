@@ -2177,3 +2177,165 @@ tr:hover td {
     border-radius: 20px;
   }
 }
+
+/* ============================================================
+   AGLOMERACIONES - HISTORIAL DE ANÁLISIS
+   ============================================================ */
+
+.history-section {
+  overflow: hidden;
+}
+
+.history-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.history-empty {
+  text-align: center;
+  padding: 48px 24px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at top, rgba(37, 99, 235, 0.10), transparent 36%),
+    linear-gradient(135deg, #ffffff, #f8fafc);
+}
+
+.history-empty-icon {
+  width: 58px;
+  height: 58px;
+  margin: 0 auto 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 20px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 28px;
+  font-weight: 850;
+}
+
+.history-empty h3 {
+  margin: 0 0 10px;
+  color: var(--text);
+  font-size: 22px;
+  font-weight: 850;
+  letter-spacing: -0.5px;
+}
+
+.history-empty p {
+  max-width: 520px;
+  margin: 0 auto 22px;
+  color: var(--text-soft);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.history-table-card {
+  padding: 22px;
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: #ffffff;
+  box-shadow: var(--shadow-md);
+}
+
+.history-table-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+.history-table-head span {
+  display: inline-flex;
+  margin-bottom: 6px;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: 0.45px;
+  text-transform: uppercase;
+}
+
+.history-table-head h3 {
+  margin: 0;
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 850;
+  letter-spacing: -0.45px;
+}
+
+.history-count {
+  padding: 7px 11px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.history-table-wrap {
+  border-radius: 18px;
+}
+
+.history-table th {
+  white-space: nowrap;
+}
+
+.history-table td {
+  vertical-align: middle;
+}
+
+.history-video-name {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 180px;
+}
+
+.history-video-name strong {
+  color: var(--text);
+  font-size: 14px;
+  word-break: break-word;
+}
+
+.history-video-name span {
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.history-date {
+  color: var(--text-soft);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/* Nivel sin datos */
+.badge.sin-datos {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+@media (max-width: 900px) {
+  .history-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .history-table-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 640px) {
+  .history-table-card {
+    padding: 18px;
+    border-radius: 20px;
+  }
+
+  .history-empty {
+    padding: 38px 18px;
+  }
+}
