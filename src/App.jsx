@@ -172,127 +172,298 @@ function Aglomeraciones() {
   return (
     <>
       <section className="hero hero-dashboard">
-      <div>
-        <span className="hero-eyebrow">Sistema inteligente de monitoreo</span>
+        <div>
+          <span className="hero-eyebrow">Sistema inteligente de monitoreo</span>
 
-        <h1>Monitoreo de aglomeraciones en pasillos</h1>
+          <h1>Monitoreo de aglomeraciones en pasillos</h1>
 
-        <p>
-          Configura zonas de referencia, analiza videos del centro comercial y visualiza
-          el nivel de aglomeración para apoyar la toma de decisiones del personal.
-        </p>
+          <p>
+            Configura zonas de referencia, analiza videos del centro comercial y visualiza
+            el nivel de aglomeración para apoyar la toma de decisiones del personal.
+          </p>
 
-        <div className="hero-actions">
-          <button className="btn-primary" onClick={() => setCreandoNuevo(true)}>
-            + Configurar pasillo
-          </button>
+          <div className="hero-actions">
+            <button className="btn-primary" onClick={() => setCreandoNuevo(true)}>
+              + Configurar pasillo
+            </button>
 
-          <button className="btn-ghost" onClick={cargarHistorial}>
-            Ver historial
-          </button>
-        </div>
-      </div>
-
-      <div className="hero-panel">
-        <div className="hero-metric">
-          <span>Pasillos</span>
-          <strong>{pasillos.length}</strong>
-          <small>Configurados para análisis</small>
-        </div>
-
-        <div className="hero-metric">
-          <span>Zonas ignoradas</span>
-          <strong>{pasillos.reduce((total, p) => total + (p.zonas?.length || 0), 0)}</strong>
-          <small>Áreas excluidas del conteo</small>
-        </div>
-
-        <div className="hero-metric">
-          <span>Historial</span>
-          <strong>{historial.length}</strong>
-          <small>Análisis cargados en sesión</small>
-        </div>
-      </div>
-    </section>
-
-      <section className="step">
-        <div className="step-head">
-          <span className="step-num">1</span>
-          <div>
-            <h2>Mis pasillos</h2>
-            <p className="step-desc">Crea un pasillo subiendo un video de referencia y dibujando las zonas a ignorar.</p>
+            <button className="btn-ghost" onClick={cargarHistorial}>
+              Ver historial
+            </button>
           </div>
         </div>
+
+        <div className="hero-panel">
+          <div className="hero-metric">
+            <span>Pasillos</span>
+            <strong>{pasillos.length}</strong>
+            <small>Configurados para análisis</small>
+          </div>
+
+          <div className="hero-metric">
+            <span>Zonas ignoradas</span>
+            <strong>{pasillos.reduce((total, p) => total + (p.zonas?.length || 0), 0)}</strong>
+            <small>Áreas excluidas del conteo</small>
+          </div>
+
+          <div className="hero-metric">
+            <span>Historial</span>
+            <strong>{historial.length}</strong>
+            <small>Análisis cargados en sesión</small>
+          </div>
+        </div>
+      </section>
+
+      <section className="step pasillos-section">
+        <div className="section-toolbar">
+          <div className="step-head compact">
+            <span className="step-num">1</span>
+            <div>
+              <h2>Configuración de pasillos</h2>
+              <p className="step-desc">
+                Administra los pasillos del centro comercial y define las zonas que el sistema debe ignorar durante el conteo.
+              </p>
+            </div>
+          </div>
+
+          <button
+            className="btn-primary"
+            onClick={() => setCreandoNuevo(true)}
+            disabled={creandoNuevo}
+          >
+            + Agregar pasillo
+          </button>
+        </div>
+
         <div className="step-body">
+          <div className="pasillos-summary">
+            <div className="summary-card">
+              <span className="summary-label">Pasillos registrados</span>
+              <strong>{pasillos.length}</strong>
+              <small>Disponibles para monitoreo</small>
+            </div>
+
+            <div className="summary-card">
+              <span className="summary-label">Zonas excluidas</span>
+              <strong>
+                {pasillos.reduce((total, p) => total + (p.zonas?.length || 0), 0)}
+              </strong>
+              <small>Áreas ignoradas en el análisis</small>
+            </div>
+
+            <div className="summary-card">
+              <span className="summary-label">Estado</span>
+              <strong>{pasillos.length > 0 ? "Listo" : "Pendiente"}</strong>
+              <small>
+                {pasillos.length > 0
+                  ? "Ya puedes analizar videos"
+                  : "Crea tu primer pasillo"}
+              </small>
+            </div>
+          </div>
+
           {pasillos.length === 0 && !creandoNuevo && (
-            <div className="empty-state">
-              <p>Aún no tienes pasillos configurados.</p>
-              <button className="btn-primary" onClick={() => setCreandoNuevo(true)}>+ Crear primer pasillo</button>
+            <div className="empty-state empty-state-pro">
+              <div className="empty-icon">⌁</div>
+              <h3>Aún no tienes pasillos configurados</h3>
+              <p>
+                Crea un pasillo subiendo un video de referencia. Luego podrás dibujar las zonas que no deben contarse.
+              </p>
+              <button className="btn-primary" onClick={() => setCreandoNuevo(true)}>
+                + Crear primer pasillo
+              </button>
             </div>
           )}
 
           {pasillos.length > 0 && (
-            <div className="pasillos-grid">
-              {pasillos.map((p) => (
-                <div key={p.id} className={`pasillo-card ${pasilloEditando?.id === p.id ? "activo" : ""}`}>
-                  <div className="pasillo-info">
-                    <h3>{p.nombre}</h3>
-                    <span className="pasillo-meta">{p.zonas.length} {p.zonas.length === 1 ? "zona" : "zonas"}</span>
+            <div className="pasillos-grid pasillos-grid-pro">
+              {pasillos.map((p) => {
+                const zonasCount = p.zonas?.length || 0;
+                const activo = pasilloEditando?.id === p.id;
+
+                return (
+                  <div
+                    key={p.id}
+                    className={`pasillo-card pasillo-card-pro ${activo ? "activo" : ""}`}
+                  >
+                    <div className="pasillo-card-header">
+                      <div className="pasillo-icon">
+                        {activo ? "✓" : "P"}
+                      </div>
+
+                      <div className="pasillo-status">
+                        {activo ? "Editando" : "Configurado"}
+                      </div>
+                    </div>
+
+                    <div className="pasillo-info">
+                      <h3>{p.nombre}</h3>
+                      <p>
+                        Pasillo registrado para análisis de aglomeraciones.
+                      </p>
+                    </div>
+
+                    <div className="pasillo-details">
+                      <div>
+                        <span>Zonas ignoradas</span>
+                        <strong>{zonasCount}</strong>
+                      </div>
+
+                      <div>
+                        <span>Tipo</span>
+                        <strong>Video</strong>
+                      </div>
+                    </div>
+
+                    <div className="pasillo-actions">
+                      <button
+                        className="btn-ghost btn-sm"
+                        onClick={() => abrirEditor(p)}
+                      >
+                        Editar zonas
+                      </button>
+
+                      <button
+                        className="btn-danger-ghost btn-sm"
+                        onClick={() => eliminarPasillo(p.id, p.nombre)}
+                      >
+                        Eliminar
+                      </button>
+                    </div>
                   </div>
-                  <div className="pasillo-actions">
-                    <button className="btn-ghost btn-sm" onClick={() => abrirEditor(p)}>Editar zonas</button>
-                    <button className="btn-danger-ghost btn-sm" onClick={() => eliminarPasillo(p.id, p.nombre)}>Eliminar</button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
+
               {!creandoNuevo && (
-                <button className="pasillo-add" onClick={() => setCreandoNuevo(true)}>+ Agregar pasillo</button>
+                <button
+                  className="pasillo-add pasillo-add-pro"
+                  onClick={() => setCreandoNuevo(true)}
+                >
+                  <span>+</span>
+                  <strong>Nuevo pasillo</strong>
+                  <small>Sube un video de referencia</small>
+                </button>
               )}
             </div>
           )}
 
           {creandoNuevo && (
-            <div className="form-crear">
-              <h4>Nuevo pasillo</h4>
-              <div className="row">
-                <input type="text" className="text-input" placeholder="Nombre (ej. Pasillo A)" value={nombreNuevo} onChange={(e) => setNombreNuevo(e.target.value)} />
-                <label className="file-input">
-                  <input type="file" accept="video/mp4,video/avi" onChange={(e) => setArchivoNuevo(e.target.files[0])} />
-                  <span>{archivoNuevo ? archivoNuevo.name : "Video de referencia"}</span>
-                </label>
-                <button className="btn-primary" onClick={crearPasillo} disabled={subiendoNuevo}>
-                  {subiendoNuevo ? "Procesando..." : "Crear y dibujar zonas"}
+            <div className="form-crear form-crear-pro">
+              <div className="form-crear-head">
+                <div>
+                  <h4>Nuevo pasillo</h4>
+                  <p>
+                    Usa un video de referencia del pasillo para obtener un frame y dibujar las zonas a ignorar.
+                  </p>
+                </div>
+
+                <button
+                  className="btn-ghost btn-sm"
+                  onClick={() => {
+                    setCreandoNuevo(false);
+                    setNombreNuevo("");
+                    setArchivoNuevo(null);
+                  }}
+                >
+                  Cerrar
                 </button>
-                <button className="btn-ghost" onClick={() => { setCreandoNuevo(false); setNombreNuevo(""); setArchivoNuevo(null); }}>Cancelar</button>
+              </div>
+
+              <div className="crear-grid">
+                <div className="field-group">
+                  <label>Nombre del pasillo</label>
+                  <input
+                    type="text"
+                    className="text-input"
+                    placeholder="Ej. Pasillo principal"
+                    value={nombreNuevo}
+                    onChange={(e) => setNombreNuevo(e.target.value)}
+                  />
+                </div>
+
+                <div className="field-group">
+                  <label>Video de referencia</label>
+                  <label className="file-input file-input-pro">
+                    <input
+                      type="file"
+                      accept="video/mp4,video/avi"
+                      onChange={(e) => setArchivoNuevo(e.target.files[0])}
+                    />
+                    <span>{archivoNuevo ? archivoNuevo.name : "Seleccionar video"}</span>
+                  </label>
+                </div>
+
+                <div className="crear-action">
+                  <button
+                    className="btn-primary"
+                    onClick={crearPasillo}
+                    disabled={subiendoNuevo}
+                  >
+                    {subiendoNuevo ? "Procesando video..." : "Crear y dibujar zonas"}
+                  </button>
+                </div>
               </div>
             </div>
           )}
 
           {pasilloEditando && (
-            <div className="editor-wrap">
+            <div className="editor-wrap editor-wrap-pro">
               <div className="editor-header">
                 <div>
-                  <h4>Editando: {pasilloEditando.nombre}</h4>
-                  <p className="editor-hint">Clic y arrastra para dibujar zonas. Clic en una zona para eliminarla.</p>
+                  <span className="editor-kicker">Editor de zonas</span>
+                  <h4>{pasilloEditando.nombre}</h4>
+                  <p className="editor-hint">
+                    Haz clic y arrastra sobre el frame para marcar zonas a ignorar. Haz clic en una zona existente para eliminarla.
+                  </p>
                 </div>
+
                 <div className="editor-actions">
-                  <button className="btn-ghost btn-sm" onClick={limpiarZonas}>Limpiar todo</button>
-                  <button className="btn-primary btn-sm" onClick={guardarZonas}>Guardar zonas ({zonasEditadas.length})</button>
-                  <button className="btn-ghost btn-sm" onClick={cerrarEditor}>Cerrar</button>
+                  <button className="btn-ghost btn-sm" onClick={limpiarZonas}>
+                    Limpiar todo
+                  </button>
+
+                  <button className="btn-primary btn-sm" onClick={guardarZonas}>
+                    Guardar zonas ({zonasEditadas.length})
+                  </button>
+
+                  <button className="btn-ghost btn-sm" onClick={cerrarEditor}>
+                    Cerrar
+                  </button>
                 </div>
               </div>
+
               <div className="zona-editor">
-                <img ref={imagenRef} src={`${API_URL}${pasilloEditando.frame_url}`} alt="Frame" draggable="false"
-                  onDragStart={(e) => e.preventDefault()} onMouseDown={iniciarDibujo} onMouseUp={terminarDibujo} />
+                <img
+                  ref={imagenRef}
+                  src={`${API_URL}${pasilloEditando.frame_url}`}
+                  alt="Frame"
+                  draggable="false"
+                  onDragStart={(e) => e.preventDefault()}
+                  onMouseDown={iniciarDibujo}
+                  onMouseUp={terminarDibujo}
+                />
+
                 {zonasEditadas.map((zona, idx) => {
                   const img = imagenRef.current;
                   if (!img) return null;
+
                   const rect = img.getBoundingClientRect();
                   const scaleX = rect.width / img.naturalWidth;
                   const scaleY = rect.height / img.naturalHeight;
+
                   return (
-                    <div key={idx} className="zona-rect"
-                      style={{ left: zona[0] * scaleX, top: zona[1] * scaleY, width: (zona[2] - zona[0]) * scaleX, height: (zona[3] - zona[1]) * scaleY }}
-                      onClick={() => quitarZona(idx)} title="Clic para eliminar" />
+                    <div
+                      key={idx}
+                      className="zona-rect"
+                      style={{
+                        left: zona[0] * scaleX,
+                        top: zona[1] * scaleY,
+                        width: (zona[2] - zona[0]) * scaleX,
+                        height: (zona[3] - zona[1]) * scaleY,
+                      }}
+                      onClick={() => quitarZona(idx)}
+                      title="Clic para eliminar"
+                    />
                   );
                 })}
               </div>
@@ -301,38 +472,151 @@ function Aglomeraciones() {
         </div>
       </section>
 
-      <section className="step">
-        <div className="step-head">
-          <span className="step-num">2</span>
-          <div>
-            <h2>Analizar video</h2>
-            <p className="step-desc">Sube el video, elige a qué pasillo pertenece e inicia el monitoreo.</p>
+      <section className="step monitor-section">
+        <div className="section-toolbar">
+          <div className="step-head compact">
+            <span className="step-num">2</span>
+            <div>
+              <h2>Ejecución del monitoreo</h2>
+              <p className="step-desc">
+                Sube un video, selecciona el pasillo correspondiente e inicia el análisis de aglomeraciones.
+              </p>
+            </div>
+          </div>
+
+          <div className={`monitor-status ${resultado ? "success" : cargandoAnalisis ? "running" : "idle"}`}>
+            {resultado ? "Análisis activo" : cargandoAnalisis ? "Procesando" : "En espera"}
           </div>
         </div>
-        <div className="step-body">
-          <div className="row">
-            <label className="file-input">
-              <input type="file" accept="video/mp4,video/avi" onChange={(e) => { setArchivoAnalisis(e.target.files[0]); setResultado(null); }} />
-              <span>{archivoAnalisis ? archivoAnalisis.name : "Seleccionar video a analizar"}</span>
+
+        <div className="monitor-grid">
+          <div className="upload-panel">
+            <label className={`upload-zone ${archivoAnalisis ? "has-file" : ""}`}>
+              <input
+                type="file"
+                accept="video/mp4,video/avi"
+                onChange={(e) => {
+                  setArchivoAnalisis(e.target.files[0]);
+                  setResultado(null);
+                }}
+              />
+
+              <div className="upload-icon">
+                {archivoAnalisis ? "✓" : "↑"}
+              </div>
+
+              <div>
+                <h3>{archivoAnalisis ? "Video seleccionado" : "Seleccionar video"}</h3>
+                <p>
+                  {archivoAnalisis
+                    ? archivoAnalisis.name
+                    : "Sube un archivo MP4 o AVI para iniciar el monitoreo."}
+                </p>
+              </div>
             </label>
-            <select className="select-input" value={pasilloSeleccionado} onChange={(e) => setPasilloSeleccionado(e.target.value)}>
-              <option value="">Elegir pasillo...</option>
-              {pasillos.map((p) => (
-                <option key={p.id} value={p.id}>{p.nombre} ({p.zonas.length} zonas)</option>
-              ))}
-            </select>
-            <button className="btn-primary" onClick={iniciarAnalisis} disabled={cargandoAnalisis || pasillos.length === 0}>
-              {cargandoAnalisis ? "Subiendo..." : "Iniciar monitoreo"}
+
+            <div className="field-group">
+              <label>Pasillo a monitorear</label>
+              <select
+                className="select-input"
+                value={pasilloSeleccionado}
+                onChange={(e) => setPasilloSeleccionado(e.target.value)}
+              >
+                <option value="">Elegir pasillo...</option>
+                {pasillos.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.nombre} ({p.zonas.length} zonas)
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {pasillos.length === 0 && (
+              <div className="info-box-warning">
+                Primero crea al menos un pasillo en el paso 1 para poder analizar videos.
+              </div>
+            )}
+
+            <button
+              className="btn-primary monitor-button"
+              onClick={iniciarAnalisis}
+              disabled={cargandoAnalisis || pasillos.length === 0 || !archivoAnalisis || !pasilloSeleccionado}
+            >
+              {cargandoAnalisis ? "Subiendo video..." : "Iniciar monitoreo"}
             </button>
           </div>
-          {pasillos.length === 0 && <div className="info-box-warning">Primero crea al menos un pasillo en el paso 1.</div>}
-          {cargandoAnalisis && <div className="info-box">Subiendo video al servidor...</div>}
-          {resultado && (
+
+          <div className="monitor-panel">
+            <div className="monitor-panel-head">
+              <div>
+                <span>Resumen</span>
+                <h3>Configuración actual</h3>
+              </div>
+            </div>
+
+            <div className="monitor-summary-list">
+              <div className="monitor-summary-item">
+                <span>Video</span>
+                <strong>{archivoAnalisis ? archivoAnalisis.name : "No seleccionado"}</strong>
+              </div>
+
+              <div className="monitor-summary-item">
+                <span>Pasillo</span>
+                <strong>
+                  {pasilloSeleccionado
+                    ? pasillos.find((p) => String(p.id) === String(pasilloSeleccionado))?.nombre || "Seleccionado"
+                    : "No seleccionado"}
+                </strong>
+              </div>
+
+              <div className="monitor-summary-item">
+                <span>Zonas ignoradas</span>
+                <strong>
+                  {pasilloSeleccionado
+                    ? pasillos.find((p) => String(p.id) === String(pasilloSeleccionado))?.zonas?.length || 0
+                    : 0}
+                </strong>
+              </div>
+            </div>
+
+            {cargandoAnalisis && (
+              <div className="monitor-loading">
+                <span className="spinner" />
+                <div>
+                  <strong>Preparando análisis</strong>
+                  <p>El video se está subiendo al servidor para generar el stream procesado.</p>
+                </div>
+              </div>
+            )}
+
+            {!resultado && !cargandoAnalisis && (
+              <div className="monitor-empty-preview">
+                <span>Vista previa del procesamiento</span>
+                <p>Cuando inicies el monitoreo, aquí aparecerá el video procesado en vivo.</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {resultado && (
+          <div className="stream-card">
+            <div className="stream-card-head">
+              <div>
+                <span>Stream procesado</span>
+                <h3>Resultado del monitoreo</h3>
+              </div>
+
+              <div className="live-pill">
+                <span />
+                EN VIVO
+              </div>
+            </div>
+
             <div className="video-stream">
               <img src={`${API_URL}${resultado.stream_url}`} alt="Procesamiento en vivo" />
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </section>
 
       <section className="step">
@@ -532,7 +816,7 @@ function Benchmark() {
 
     try {
       await fetch(`${BENCHMARK_URL}/sesion/${sid}`, { method: "DELETE" });
-    } catch {}
+    } catch { }
 
     setModeloActual(null);
     setEjecutando(false);
@@ -542,7 +826,7 @@ function Benchmark() {
     if (sessionId) {
       try {
         await fetch(`${BENCHMARK_URL}/sesion/${sessionId}`, { method: "DELETE" });
-      } catch {}
+      } catch { }
     }
     setResultados({});
     setProgreso({});
@@ -841,8 +1125,8 @@ function Benchmark() {
                   const f1 = r.metricas?.f1_score ?? 0;
                   const medallaClase =
                     idx === 0 ? "medalla-oro" :
-                    idx === 1 ? "medalla-plata" :
-                    idx === 2 ? "medalla-bronce" : "medalla-otro";
+                      idx === 1 ? "medalla-plata" :
+                        idx === 2 ? "medalla-bronce" : "medalla-otro";
                   return (
                     <div key={r.id} className={`ranking-item ${idx === 0 ? "lider" : ""}`}>
                       <div className={`ranking-medalla ${medallaClase}`}>
@@ -991,7 +1275,7 @@ function Realtime() {
   const detenerSilencioso = async () => {
     try {
       await fetch(`${REALTIME_URL}/detener`, { method: "POST" });
-    } catch {}
+    } catch { }
   };
 
   const iniciar = async () => {
