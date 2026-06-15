@@ -3,16 +3,8 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import Header from "./components/Header";
 import Login from "./pages/Login";
 import Aglomeraciones from "./pages/Aglomeraciones";
-
-// Por ahora las páginas son placeholders. En las próximas entregas
-// reemplazaremos cada una por su componente real.
-
-function Benchmark() {
-  return <div style={{ padding: 40 }}>Benchmark (próxima entrega)</div>;
-}
-function Realtime() {
-  return <div style={{ padding: 40 }}>Tiempo Real (próxima entrega)</div>;
-}
+import Benchmark from "./pages/Benchmark";
+import Realtime from "./pages/Realtime";
 
 function AppContent() {
   const { usuario, cargando } = useAuth();
