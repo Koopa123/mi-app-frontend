@@ -171,10 +171,48 @@ function Aglomeraciones() {
 
   return (
     <>
-      <section className="hero">
-        <h1>Monitoreo de aglomeraciones</h1>
-        <p>Configura los pasillos una sola vez, luego analiza videos eligiendo el pasillo correspondiente.</p>
-      </section>
+      <section className="hero hero-dashboard">
+      <div>
+        <span className="hero-eyebrow">Sistema inteligente de monitoreo</span>
+
+        <h1>Monitoreo de aglomeraciones en pasillos</h1>
+
+        <p>
+          Configura zonas de referencia, analiza videos del centro comercial y visualiza
+          el nivel de aglomeración para apoyar la toma de decisiones del personal.
+        </p>
+
+        <div className="hero-actions">
+          <button className="btn-primary" onClick={() => setCreandoNuevo(true)}>
+            + Configurar pasillo
+          </button>
+
+          <button className="btn-ghost" onClick={cargarHistorial}>
+            Ver historial
+          </button>
+        </div>
+      </div>
+
+      <div className="hero-panel">
+        <div className="hero-metric">
+          <span>Pasillos</span>
+          <strong>{pasillos.length}</strong>
+          <small>Configurados para análisis</small>
+        </div>
+
+        <div className="hero-metric">
+          <span>Zonas ignoradas</span>
+          <strong>{pasillos.reduce((total, p) => total + (p.zonas?.length || 0), 0)}</strong>
+          <small>Áreas excluidas del conteo</small>
+        </div>
+
+        <div className="hero-metric">
+          <span>Historial</span>
+          <strong>{historial.length}</strong>
+          <small>Análisis cargados en sesión</small>
+        </div>
+      </div>
+    </section>
 
       <section className="step">
         <div className="step-head">
