@@ -2,12 +2,11 @@ import { useState } from "react";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import Header from "./components/Header";
 import Login from "./pages/Login";
+import Aglomeraciones from "./pages/Aglomeraciones";
 
 // Por ahora las páginas son placeholders. En las próximas entregas
 // reemplazaremos cada una por su componente real.
-function Aglomeraciones() {
-  return <div style={{ padding: 40 }}>Aglomeraciones (próxima entrega)</div>;
-}
+
 function Benchmark() {
   return <div style={{ padding: 40 }}>Benchmark (próxima entrega)</div>;
 }
