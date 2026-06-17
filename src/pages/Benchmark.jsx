@@ -12,18 +12,23 @@ const MODELOS = [
   { id: "pose_xgb_norm", nombre: "Pose + XGBoost Norm", desc: "YOLO Pose genérico + XGBoost normalizado", tag: "Pose" },
 ];
 
-function Metric({ label, value }) {
-  return (
-    <div className="metric">
-      <span className="metric-value">{value}</span>
-      <span className="metric-label">{label}</span>
-    </div>
-  );
-}
+const MODELOS_VISUALES = new Set([
+  "pose_xgb_booster",
+  "pose_xgb_norm",
+  "pose_svm",
+]);
 
 export default function Benchmark() {
+  // FUENTE DEL VIDEO: "demo" o "upload"
+  const [fuenteVideo, setFuenteVideo] = useState("demo");
+  const [videosDemo, setVideosDemo] = useState([]);
+  const [demoSeleccionadoId, setDemoSeleccionadoId] = useState("");
+  const [streamUrl, setStreamUrl] = useState(null);
+
+  // VIDEO SUBIDO
   const [archivo, setArchivo] = useState(null);
   const [videoPreviewUrl, setVideoPreviewUrl] = useState(null);
+
   const [duracionVideo, setDuracionVideo] = useState(0);
   const [intervalos, setIntervalos] = useState([{ inicio_seg: 0, fin_seg: 0 }]);
   const [tieneRobo, setTieneRobo] = useState(true);
@@ -37,6 +42,24 @@ export default function Benchmark() {
   const [videoUrl, setVideoUrl] = useState(null);
   const [tiempoTranscurrido, setTiempoTranscurrido] = useState(0);
 
+  // Cargar los videos demo al entrar
+  useEffect(() => {
+    const cargar = async () => {
+      try {
+        const res = await fetch(`${BENCHMARK_URL}/videos-demo`);
+        const data = await res.json();
+        setVideosDemo(data.videos || []);
+        if (data.videos && data.videos.length > 0) {
+          setDemoSeleccionadoId(data.videos[0].id);
+        }
+      } catch (err) {
+        console.error("Error cargando videos demo:", err);
+      }
+    };
+    cargar();
+  }, []);
+
+  // Preview cuando subes un archivo
   useEffect(() => {
     if (!archivo) {
       setVideoPreviewUrl(null);
@@ -46,6 +69,23 @@ export default function Benchmark() {
     setVideoPreviewUrl(url);
     return () => URL.revokeObjectURL(url);
   }, [archivo]);
+
+  // Preview cuando eliges un demo
+  useEffect(() => {
+    if (fuenteVideo !== "demo" || !demoSeleccionadoId) {
+      return;
+    }
+    const demo = videosDemo.find((d) => d.id === demoSeleccionadoId);
+    if (!demo) return;
+    // Cargar intervalos del demo automáticamente
+    if (demo.intervalos_robo && demo.intervalos_robo.length > 0) {
+      setIntervalos(demo.intervalos_robo);
+      setTieneRobo(true);
+    } else {
+      setIntervalos([{ inicio_seg: 0, fin_seg: 0 }]);
+      setTieneRobo(false);
+    }
+  }, [demoSeleccionadoId, fuenteVideo, videosDemo]);
 
   useEffect(() => {
     if (!ejecutando) return;
@@ -59,7 +99,9 @@ export default function Benchmark() {
   const onMetadataVideo = (e) => {
     const dur = e.target.duration;
     setDuracionVideo(dur);
-    setIntervalos([{ inicio_seg: 0, fin_seg: Math.min(15, dur) }]);
+    if (fuenteVideo === "upload") {
+      setIntervalos([{ inicio_seg: 0, fin_seg: Math.min(15, dur) }]);
+    }
   };
 
   const actualizarIntervalo = (idx, campo, valor) => {
@@ -96,16 +138,17 @@ export default function Benchmark() {
         alert("Cada intervalo debe tener fin > inicio");
         return null;
       }
-      if (iv.fin_seg > duracionVideo + 0.5) {
-        alert(`El intervalo se sale del video (duración: ${duracionVideo.toFixed(1)}s)`);
-        return null;
-      }
     }
     return intervalos;
   };
 
+  // ¿Estamos listos para iniciar?
+  const fuenteLista =
+    (fuenteVideo === "demo" && demoSeleccionadoId) ||
+    (fuenteVideo === "upload" && archivo);
+
   const iniciarBenchmark = async () => {
-    if (!archivo) return alert("Sube un video primero");
+    if (!fuenteLista) return alert("Selecciona o sube un video");
     if (seleccionados.length === 0) return alert("Selecciona al menos un modelo");
 
     const intervalosValidos = validarIntervalos();
@@ -120,19 +163,30 @@ export default function Benchmark() {
 
     let sid;
     try {
-      const formData = new FormData();
-      formData.append("file", archivo);
-      const res = await fetch(`${BENCHMARK_URL}/sesion/iniciar`, {
-        method: "POST",
-        body: formData,
-      });
+      let res;
+      if (fuenteVideo === "demo") {
+        // Usar un video demo
+        res = await fetch(`${BENCHMARK_URL}/sesion/iniciar-demo`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ demo_id: demoSeleccionadoId }),
+        });
+      } else {
+        // Subir el video
+        const formData = new FormData();
+        formData.append("file", archivo);
+        res = await fetch(`${BENCHMARK_URL}/sesion/iniciar`, {
+          method: "POST",
+          body: formData,
+        });
+      }
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || "Error subiendo video");
+      if (!res.ok) throw new Error(data.detail || "Error iniciando sesión");
       sid = data.session_id;
       setSessionId(sid);
       setVideoUrl(`${BENCHMARK_URL}${data.video_url}`);
     } catch (err) {
-      alert("Error subiendo video: " + err.message);
+      alert("Error iniciando sesión: " + err.message);
       setEjecutando(false);
       return;
     }
@@ -142,16 +196,36 @@ export default function Benchmark() {
       setProgreso((p) => ({ ...p, [modeloId]: "corriendo" }));
 
       try {
-        const res = await fetch(
-          `${BENCHMARK_URL}/sesion/${sid}/correr/${modeloId}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ intervalos_robo: intervalosValidos }),
+        let data;
+
+        if (MODELOS_VISUALES.has(modeloId)) {
+          const urlVisual = `${BENCHMARK_URL}/sesion/${sid}/stream/${modeloId}?t=${Date.now()}`;
+          setStreamUrl(urlVisual);
+
+          await sleep(500);
+
+          data = await esperarResultadoStream(
+            sid,
+            modeloId,
+            intervalosValidos
+          );
+        } else {
+          const res = await fetch(
+            `${BENCHMARK_URL}/sesion/${sid}/correr/${modeloId}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ intervalos_robo: intervalosValidos }),
+            }
+          );
+
+          data = await res.json();
+
+          if (!res.ok) {
+            throw new Error(data.detail || "Error");
           }
-        );
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.detail || "Error");
+        }
+
         setResultados((r) => ({ ...r, [modeloId]: data }));
         setProgreso((p) => ({ ...p, [modeloId]: "ok" }));
       } catch (err) {
@@ -160,9 +234,11 @@ export default function Benchmark() {
       }
     }
 
+    setStreamUrl(null);
+
     try {
       await fetch(`${BENCHMARK_URL}/sesion/${sid}`, { method: "DELETE" });
-    } catch {}
+    } catch { }
 
     setModeloActual(null);
     setEjecutando(false);
@@ -172,16 +248,21 @@ export default function Benchmark() {
     if (sessionId) {
       try {
         await fetch(`${BENCHMARK_URL}/sesion/${sessionId}`, { method: "DELETE" });
-      } catch {}
+      } catch { }
     }
+
     setResultados({});
     setProgreso({});
     setArchivo(null);
     setVideoUrl(null);
+    setStreamUrl(null);
     setSessionId(null);
     setTiempoTranscurrido(0);
-    setIntervalos([{ inicio_seg: 0, fin_seg: 0 }]);
-    setTieneRobo(true);
+
+    if (fuenteVideo === "upload") {
+      setIntervalos([{ inicio_seg: 0, fin_seg: 0 }]);
+      setTieneRobo(true);
+    }
   };
 
   const formatearTiempo = (segs) => {
@@ -190,8 +271,37 @@ export default function Benchmark() {
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
-  const totalSospechosos = (r) =>
-    r.personas_detectadas?.filter((p) => p.prediccion === "SHOPLIFTING").length || 0;
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  const esperarResultadoStream = async (sid, modeloId, intervalosValidos) => {
+    const maxIntentos = 720;
+
+    for (let intento = 0; intento < maxIntentos; intento++) {
+      const res = await fetch(
+        `${BENCHMARK_URL}/sesion/${sid}/resultado-stream/${modeloId}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ intervalos_robo: intervalosValidos }),
+        }
+      );
+
+      if (res.status === 202) {
+        await sleep(1000);
+        continue;
+      }
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.detail || "Error obteniendo resultado visual");
+      }
+
+      return data;
+    }
+
+    throw new Error("El procesamiento visual tardó demasiado o no devolvió resultado.");
+  };
 
   const resultadosOrdenados = Object.entries(resultados)
     .map(([id, data]) => ({ id, ...data }))
@@ -206,6 +316,12 @@ export default function Benchmark() {
   const completados = Object.values(progreso).filter((e) => e === "ok" || e === "error").length;
   const porcentaje = totalModelos > 0 ? Math.round((completados / totalModelos) * 100) : 0;
 
+  // Para la preview cuando es demo
+  const demoActual = videosDemo.find((d) => d.id === demoSeleccionadoId);
+  const previewDemoUrl = demoActual
+    ? `${BENCHMARK_URL}/videos-demo-preview/${demoSeleccionadoId}`
+    : null;
+
   return (
     <>
       <section className="hero">
@@ -217,8 +333,20 @@ export default function Benchmark() {
         <section className="step running-view">
           <div className="running-grid">
             <div className="running-video">
-              <video src={videoUrl} controls autoPlay loop muted />
-              <div className="running-video-label">Video en análisis</div>
+              {streamUrl ? (
+                <img
+                  key={streamUrl}
+                  src={streamUrl}
+                  alt="Detección visual del modelo"
+                  className="stream-img"
+                />
+              ) : (
+                <video src={videoUrl} controls autoPlay loop muted />
+              )}
+
+              <div className="running-video-label">
+                {streamUrl ? "Detección visual en vivo" : "Video en análisis"}
+              </div>
             </div>
 
             <div className="running-info">
@@ -277,39 +405,114 @@ export default function Benchmark() {
             <div className="step-head">
               <span className="step-num">1</span>
               <div>
-                <h2>Subir video</h2>
-                <p className="step-desc">Sube el video que quieres analizar.</p>
+                <h2>Elegir video</h2>
+                <p className="step-desc">
+                  Usa un video pre-cargado del sistema o sube uno propio.
+                </p>
               </div>
             </div>
 
             <div className="step-body">
-              <div className="row">
-                <label className="file-input">
+              <div className="radio-group">
+                <label className={`radio-option ${fuenteVideo === "demo" ? "activa" : ""}`}>
                   <input
-                    type="file"
-                    accept="video/mp4,video/avi"
-                    onChange={(e) => setArchivo(e.target.files[0])}
+                    type="radio"
+                    checked={fuenteVideo === "demo"}
+                    onChange={() => setFuenteVideo("demo")}
                   />
-                  <span>{archivo ? archivo.name : "Seleccionar video"}</span>
+                  <span>Usar video demo precargado</span>
+                </label>
+                <label className={`radio-option ${fuenteVideo === "upload" ? "activa" : ""}`}>
+                  <input
+                    type="radio"
+                    checked={fuenteVideo === "upload"}
+                    onChange={() => setFuenteVideo("upload")}
+                  />
+                  <span>Subir mi propio video</span>
                 </label>
               </div>
 
-              {videoPreviewUrl && (
-                <div className="video-preview">
-                  <video
-                    src={videoPreviewUrl}
-                    controls
-                    onLoadedMetadata={onMetadataVideo}
-                  />
-                  <div className="video-preview-info">
-                    Duración: <strong>{duracionVideo.toFixed(1)}s</strong>
+              {fuenteVideo === "demo" && (
+                <>
+                  {videosDemo.length === 0 ? (
+                    <div className="info-box-warning">
+                      No hay videos demo disponibles en el servidor.
+                    </div>
+                  ) : (
+                    <>
+                      <div className="field-group">
+                        <label>Video disponible</label>
+                        <select
+                          className="select-input"
+                          value={demoSeleccionadoId}
+                          onChange={(e) => setDemoSeleccionadoId(e.target.value)}
+                          style={{ width: "100%" }}
+                        >
+                          {videosDemo.map((d) => (
+                            <option key={d.id} value={d.id}>{d.nombre}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {demoActual && demoActual.descripcion && (
+                        <div className="info-box">{demoActual.descripcion}</div>
+                      )}
+
+                      {demoActual && (
+                        <div className="video-preview">
+                          <video
+                            src={`${BENCHMARK_URL}/sesion-preview-demo?demo_id=${demoActual.id}`}
+                            controls
+                            onLoadedMetadata={onMetadataVideo}
+                          />
+                          <div className="video-preview-info">
+                            Intervalos de robo: <strong>
+                              {demoActual.intervalos_robo.length === 0
+                                ? "Ninguno (video normal)"
+                                : demoActual.intervalos_robo
+                                  .map((iv) => `${iv.inicio_seg}s - ${iv.fin_seg}s`)
+                                  .join(", ")
+                              }
+                            </strong>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
+
+              {fuenteVideo === "upload" && (
+                <>
+                  <div className="row">
+                    <label className="file-input">
+                      <input
+                        type="file"
+                        accept="video/mp4,video/avi"
+                        onChange={(e) => setArchivo(e.target.files[0])}
+                      />
+                      <span>{archivo ? archivo.name : "Seleccionar video"}</span>
+                    </label>
                   </div>
-                </div>
+
+                  {videoPreviewUrl && (
+                    <div className="video-preview">
+                      <video
+                        src={videoPreviewUrl}
+                        controls
+                        onLoadedMetadata={onMetadataVideo}
+                      />
+                      <div className="video-preview-info">
+                        Duración: <strong>{duracionVideo.toFixed(1)}s</strong>
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </section>
 
-          {videoPreviewUrl && (
+          {fuenteLista && fuenteVideo === "upload" && (
             <section className="step">
               <div className="step-head">
                 <span className="step-num">2</span>
@@ -352,7 +555,6 @@ export default function Benchmark() {
                             <input
                               type="number"
                               min="0"
-                              max={duracionVideo}
                               step="0.5"
                               value={iv.inicio_seg}
                               onChange={(e) => actualizarIntervalo(idx, "inicio_seg", e.target.value)}
@@ -364,7 +566,6 @@ export default function Benchmark() {
                             <input
                               type="number"
                               min="0"
-                              max={duracionVideo}
                               step="0.5"
                               value={iv.fin_seg}
                               onChange={(e) => actualizarIntervalo(idx, "fin_seg", e.target.value)}
@@ -391,10 +592,10 @@ export default function Benchmark() {
             </section>
           )}
 
-          {videoPreviewUrl && (
+          {fuenteLista && (
             <section className="step">
               <div className="step-head">
-                <span className="step-num">3</span>
+                <span className="step-num">{fuenteVideo === "upload" ? "3" : "2"}</span>
                 <div>
                   <h2>Elegir modelos</h2>
                   <p className="step-desc">Selecciona qué modelos quieres evaluar.</p>
@@ -438,7 +639,7 @@ export default function Benchmark() {
                   <button
                     className="btn-primary"
                     onClick={iniciarBenchmark}
-                    disabled={!archivo || seleccionados.length === 0}
+                    disabled={!fuenteLista || seleccionados.length === 0}
                   >
                     Iniciar benchmark ({seleccionados.length} {seleccionados.length === 1 ? "modelo" : "modelos"})
                   </button>
@@ -469,8 +670,8 @@ export default function Benchmark() {
                   const f1 = r.metricas?.f1_score ?? 0;
                   const medallaClase =
                     idx === 0 ? "medalla-oro" :
-                    idx === 1 ? "medalla-plata" :
-                    idx === 2 ? "medalla-bronce" : "medalla-otro";
+                      idx === 1 ? "medalla-plata" :
+                        idx === 2 ? "medalla-bronce" : "medalla-otro";
                   return (
                     <div key={r.id} className={`ranking-item ${idx === 0 ? "lider" : ""}`}>
                       <div className={`ranking-medalla ${medallaClase}`}>
