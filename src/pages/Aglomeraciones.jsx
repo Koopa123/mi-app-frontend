@@ -142,41 +142,72 @@ export default function Aglomeraciones() {
   return (
     <>
       <section className="hero hero-dashboard">
-        <div>
-          <span className="hero-eyebrow">Sistema inteligente de monitoreo</span>
-          <h1>Monitoreo de aglomeraciones en pasillos</h1>
+        <div className="hero-copy">
+          <span className="hero-eyebrow">Módulo de aglomeraciones</span>
+          <h1>Control visual de pasillos del centro comercial</h1>
           <p>
-            Configura zonas de referencia, analiza videos del centro comercial y visualiza
-            el nivel de aglomeración para apoyar la toma de decisiones del personal.
+            Analiza videos de los pasillos, excluye zonas que no deben contarse y obtén
+            una lectura clara del nivel de aglomeración para apoyar al personal de seguridad.
           </p>
 
-          <div className="hero-actions">
-            <button className="btn-primary" onClick={() => setCreandoNuevo(true)}>
-              + Configurar pasillo
-            </button>
-            <button className="btn-ghost" onClick={cargarHistorial}>
-              Ver historial
-            </button>
+          <div className="hero-highlights" aria-label="Capacidades principales">
+            <div className="hero-highlight">
+              <span>01</span>
+              <strong>Configura pasillos</strong>
+            </div>
+            <div className="hero-highlight">
+              <span>02</span>
+              <strong>Ignora zonas no válidas</strong>
+            </div>
+            <div className="hero-highlight">
+              <span>03</span>
+              <strong>Revisa resultados</strong>
+            </div>
           </div>
         </div>
 
-        <div className="hero-panel">
-          <div className="hero-metric">
-            <span>Pasillos</span>
-            <strong>{pasillos.length}</strong>
-            <small>Configurados para análisis</small>
+        <aside className="hero-flow-card" aria-label="Flujo del módulo">
+          <div className="hero-card-top">
+            <div>
+              <span className="hero-card-label">Estado del módulo</span>
+              <h3>{pasillos.length > 0 ? "Preparado para monitoreo" : "Listo para configurar"}</h3>
+            </div>
+            <span className={`hero-state ${pasillos.length > 0 ? "ready" : "pending"}`}>
+              {pasillos.length > 0 ? "Activo" : "Pendiente"}
+            </span>
           </div>
-          <div className="hero-metric">
-            <span>Zonas ignoradas</span>
-            <strong>{pasillos.reduce((total, p) => total + (p.zonas?.length || 0), 0)}</strong>
-            <small>Áreas excluidas del conteo</small>
+
+          <div className="hero-status-list">
+            <div className={`hero-status-item ${pasillos.length > 0 ? "active" : ""}`}>
+              <span className="status-dot" />
+              <div>
+                <strong>Configuración de pasillos</strong>
+                <p>Registra el pasillo y define las zonas que no serán tomadas en cuenta.</p>
+              </div>
+            </div>
+
+            <div className={`hero-status-item ${archivoAnalisis || resultado ? "active" : ""}`}>
+              <span className="status-dot" />
+              <div>
+                <strong>Monitoreo de video</strong>
+                <p>Selecciona un pasillo y procesa el video para calcular la aglomeración.</p>
+              </div>
+            </div>
+
+            <div className={`hero-status-item ${historial.length > 0 || resultado ? "active" : ""}`}>
+              <span className="status-dot" />
+              <div>
+                <strong>Registro de resultados</strong>
+                <p>Consulta el nivel final, el máximo de personas y los eventos analizados.</p>
+              </div>
+            </div>
           </div>
-          <div className="hero-metric">
-            <span>Historial</span>
-            <strong>{historial.length}</strong>
-            <small>Análisis cargados en sesión</small>
+
+          <div className="hero-flow-note">
+            <span>Flujo recomendado</span>
+            <strong>Configurar → Monitorear → Revisar</strong>
           </div>
-        </div>
+        </aside>
       </section>
 
       <section className="step pasillos-section">
