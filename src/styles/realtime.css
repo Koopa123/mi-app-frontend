@@ -59,7 +59,7 @@
    ============================================================ */
 .realtime-stats {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 12px;
   margin-top: 14px;
 }
@@ -122,4 +122,13 @@
   height: 10px;
   border-radius: 50%;
   flex-shrink: 0;
+}
+
+.stat-card.stat-medio {
+  background: rgba(234, 179, 8, 0.08);
+  border-color: rgba(234, 179, 8, 0.3);
+}
+
+.stat-card.stat-medio .stat-value {
+  color: #ca8a04;
 }

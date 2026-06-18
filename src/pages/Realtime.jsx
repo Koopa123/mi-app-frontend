@@ -18,6 +18,9 @@ export default function Realtime() {
   const [totalPersonas, setTotalPersonas] = useState(0);
   const [sospechosos, setSospechosos] = useState(0);
 
+  const [grupoMayor, setGrupoMayor] = useState(0);
+  const [nivel, setNivel] = useState("BAJO");
+
   // El frame procesado que devuelve el server (base64)
   const [frameProcesado, setFrameProcesado] = useState(null);
 
@@ -25,7 +28,7 @@ export default function Realtime() {
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const wsRef = useRef(null);
-  const streamRef = useRef(null); 
+  const streamRef = useRef(null);
   const esperandoRespuestaRef = useRef(false);
 
   // ============================================================
@@ -105,7 +108,16 @@ export default function Realtime() {
           }
           setFps(data.fps || 0);
           setTotalPersonas(data.total_personas || 0);
-          setSospechosos(data.sospechosos || 0);
+
+          if (data.modo === "aglomeraciones") {
+            setGrupoMayor(data.grupo_mayor || 0);
+            setNivel(data.nivel || "BAJO");
+            setSospechosos(0);
+          } else {
+            setSospechosos(data.sospechosos || 0);
+            setGrupoMayor(0);
+            setNivel("BAJO");
+          }
 
           esperandoRespuestaRef.current = false;
           // Disparar el siguiente frame
@@ -197,7 +209,7 @@ export default function Realtime() {
     if (wsRef.current) {
       try {
         wsRef.current.close();
-      } catch {}
+      } catch { }
       wsRef.current = null;
     }
     // Cerrar webcam
@@ -218,6 +230,9 @@ export default function Realtime() {
     setFps(0);
     setTotalPersonas(0);
     setSospechosos(0);
+    setGrupoMayor(0);
+    setNivel("BAJO");
+
   };
 
   const cambiarModo = (nuevoId) => {
@@ -349,31 +364,62 @@ export default function Realtime() {
                 <div className="stat-label">Personas</div>
                 <div className="stat-value">{totalPersonas}</div>
               </div>
-              <div
-                className={`stat-card ${
-                  sospechosos > 0 ? "stat-alerta" : ""
-                }`}
-              >
-                <div className="stat-label">Sospechosos</div>
-                <div className="stat-value">{sospechosos}</div>
-              </div>
+
+              {modoId === "aglomeraciones" ? (
+                <>
+                  <div className="stat-card">
+                    <div className="stat-label">Grupo mayor</div>
+                    <div className="stat-value">{grupoMayor}</div>
+                  </div>
+                  <div
+                    className={`stat-card ${
+                      nivel === "ALTO"
+                        ? "stat-alerta"
+                        : nivel === "MEDIO"
+                        ? "stat-medio"
+                        : ""
+                    }`}
+                  >
+                    <div className="stat-label">Nivel</div>
+                    <div className="stat-value">{nivel}</div>
+                  </div>
+                </>
+              ) : (
+                <div
+                  className={`stat-card ${
+                    sospechosos > 0 ? "stat-alerta" : ""
+                  }`}
+                >
+                  <div className="stat-label">Sospechosos</div>
+                  <div className="stat-value">{sospechosos}</div>
+                </div>
+              )}
             </div>
 
             <div className="realtime-leyenda">
-              <span className="leyenda-item">
-                <span
-                  className="leyenda-dot"
-                  style={{ background: "#00c850" }}
-                />
-                Verde: persona normal
-              </span>
-              <span className="leyenda-item">
-                <span
-                  className="leyenda-dot"
-                  style={{ background: "#dc2626" }}
-                />
-                Rojo: persona sospechosa
-              </span>
+              {modoId === "aglomeraciones" ? (
+                <>
+                  <span className="leyenda-item">
+                    <span className="leyenda-dot" style={{ background: "#00c850" }} />
+                    Verde: persona detectada
+                  </span>
+                  <span className="leyenda-item">
+                    <span className="leyenda-dot" style={{ background: "#ffeb3b" }} />
+                    Líneas amarillas: personas agrupadas
+                  </span>
+                </>
+              ) : (
+                <>
+                  <span className="leyenda-item">
+                    <span className="leyenda-dot" style={{ background: "#00c850" }} />
+                    Verde: persona normal
+                  </span>
+                  <span className="leyenda-item">
+                    <span className="leyenda-dot" style={{ background: "#dc2626" }} />
+                    Rojo: persona sospechosa
+                  </span>
+                </>
+              )}
             </div>
           </div>
         </section>
