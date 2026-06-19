@@ -2,9 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { REALTIME_URL, REALTIME_WS_URL } from "../services/api";
 import "../styles/realtime.css";
 
-// Cada cuántos ms intentar capturar frame si el server tarda mucho
-// (es un timeout de seguridad, normalmente el server responde antes)
 const FRAME_TIMEOUT_MS = 5000;
+const DEBOUNCE_SOSPECHOSA_MS = 2000;   // No dispara nueva alerta sospechosa si hubo una hace menos de 2s
+const TOAST_DURATION_MS = 5000;
+const MAX_HISTORIAL = 5;
 
 export default function Realtime() {
   const [modos, setModos] = useState([]);
@@ -13,16 +14,18 @@ export default function Realtime() {
   const [iniciando, setIniciando] = useState(false);
   const [error, setError] = useState(null);
 
-  // Stats que vienen del backend
   const [fps, setFps] = useState(0);
   const [totalPersonas, setTotalPersonas] = useState(0);
   const [sospechosos, setSospechosos] = useState(0);
-
   const [grupoMayor, setGrupoMayor] = useState(0);
   const [nivel, setNivel] = useState("BAJO");
 
-  // El frame procesado que devuelve el server (base64)
   const [frameProcesado, setFrameProcesado] = useState(null);
+
+  // Alertas
+  const [alertaActiva, setAlertaActiva] = useState(null);  // banner persistente
+  const [toasts, setToasts] = useState([]);                // toasts efímeros
+  const [historial, setHistorial] = useState([]);          // lista de eventos
 
   // Refs
   const videoRef = useRef(null);
@@ -30,6 +33,10 @@ export default function Realtime() {
   const wsRef = useRef(null);
   const streamRef = useRef(null);
   const esperandoRespuestaRef = useRef(false);
+
+  // Refs para debounce
+  const nivelAnteriorRef = useRef("BAJO");
+  const ultimaAlertaSospechosaRef = useRef(0);
 
   // ============================================================
   // CARGAR MODOS DISPONIBLES
@@ -52,42 +59,115 @@ export default function Realtime() {
     };
     cargar();
 
-    // Cleanup al desmontar
     return () => {
       detener();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ============================================================
-  // INICIAR: pedir webcam + abrir WebSocket
+  // HELPERS DE ALERTAS
+  // ============================================================
+  const obtenerHora = () => {
+    const ahora = new Date();
+    return ahora.toLocaleTimeString("es-PE", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  };
+
+  const obtenerZona = (bbox, frameWidth, frameHeight) => {
+    // bbox = [x1, y1, x2, y2] -> calcula la posición del centro en términos de zona
+    const cx = (bbox[0] + bbox[2]) / 2;
+    const cy = (bbox[1] + bbox[3]) / 2;
+
+    const vertical =
+      cy < frameHeight / 3
+        ? "superior"
+        : cy < (frameHeight * 2) / 3
+        ? "centro"
+        : "inferior";
+    const horizontal =
+      cx < frameWidth / 3
+        ? "izquierda"
+        : cx < (frameWidth * 2) / 3
+        ? "centro"
+        : "derecha";
+
+    if (vertical === "centro" && horizontal === "centro") return "Centro";
+    if (vertical === "centro") return `Centro ${horizontal}`;
+    if (horizontal === "centro") return `${vertical} centro`;
+    return `${vertical} ${horizontal}`;
+  };
+
+  const obtenerZonaPromedio = (detecciones, frameWidth, frameHeight) => {
+    if (!detecciones || detecciones.length === 0) return "Vista actual";
+    // Promedio de centros
+    let sumX = 0,
+      sumY = 0;
+    detecciones.forEach((d) => {
+      sumX += (d.bbox[0] + d.bbox[2]) / 2;
+      sumY += (d.bbox[1] + d.bbox[3]) / 2;
+    });
+    const cx = sumX / detecciones.length;
+    const cy = sumY / detecciones.length;
+    return obtenerZona([cx, cy, cx, cy], frameWidth, frameHeight);
+  };
+
+  const agregarToast = (titulo, descripcion, tipo) => {
+    const id = Date.now() + Math.random();
+    const hora = obtenerHora();
+    const nuevoToast = { id, titulo, descripcion, tipo, hora };
+
+    setToasts((prev) => [...prev, nuevoToast]);
+    setHistorial((prev) =>
+      [{ id, titulo, descripcion, tipo, hora }, ...prev].slice(0, MAX_HISTORIAL)
+    );
+
+    // Auto-remover después de TOAST_DURATION_MS
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, TOAST_DURATION_MS);
+  };
+
+  const limpiarToast = (id) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
+
+  // ============================================================
+  // INICIAR
   // ============================================================
   const iniciar = async () => {
     if (!modoId) return;
     setError(null);
     setIniciando(true);
 
+    // Reset de alertas al iniciar
+    setAlertaActiva(null);
+    setToasts([]);
+    setHistorial([]);
+    nivelAnteriorRef.current = "BAJO";
+    ultimaAlertaSospechosaRef.current = 0;
+
     try {
-      // 1. Pedir permiso de webcam
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 480, height: 360 },
+        video: { width: 640, height: 480 },
         audio: false,
       });
       streamRef.current = stream;
 
-      // 2. Conectar el stream al <video>
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
 
-      // 3. Abrir WebSocket
       const ws = new WebSocket(`${REALTIME_WS_URL}?modo=${modoId}`);
       wsRef.current = ws;
 
       ws.onopen = () => {
         setActivo(true);
         setIniciando(false);
-        // Disparar el primer frame
         enviarSiguienteFrame();
       };
 
@@ -100,7 +180,6 @@ export default function Realtime() {
             return;
           }
 
-          // Pintar el frame procesado
           if (data.frame_jpeg_base64) {
             setFrameProcesado(
               `data:image/jpeg;base64,${data.frame_jpeg_base64}`
@@ -109,18 +188,25 @@ export default function Realtime() {
           setFps(data.fps || 0);
           setTotalPersonas(data.total_personas || 0);
 
+          // Procesar según modo
           if (data.modo === "aglomeraciones") {
-            setGrupoMayor(data.grupo_mayor || 0);
-            setNivel(data.nivel || "BAJO");
+            const nuevoNivel = data.nivel || "BAJO";
+            const grupo = data.grupo_mayor || 0;
+            setGrupoMayor(grupo);
+            setNivel(nuevoNivel);
             setSospechosos(0);
+
+            procesarAlertaAglomeracion(nuevoNivel, grupo, data.detecciones);
           } else {
-            setSospechosos(data.sospechosos || 0);
+            const susp = data.sospechosos || 0;
+            setSospechosos(susp);
             setGrupoMayor(0);
             setNivel("BAJO");
+
+            procesarAlertaSospechosa(susp, data.detecciones);
           }
 
           esperandoRespuestaRef.current = false;
-          // Disparar el siguiente frame
           enviarSiguienteFrame();
         } catch (e) {
           console.error("Error procesando mensaje del server:", e);
@@ -150,7 +236,74 @@ export default function Realtime() {
   };
 
   // ============================================================
-  // ENVIAR SIGUIENTE FRAME
+  // LÓGICA DE ALERTAS POR MODO
+  // ============================================================
+  const procesarAlertaAglomeracion = (nuevoNivel, grupo, detecciones) => {
+    const frameW = canvasRef.current?.width || 640;
+    const frameH = canvasRef.current?.height || 480;
+
+    if (nuevoNivel === "ALTO") {
+      const zona = obtenerZonaPromedio(detecciones, frameW, frameH);
+      setAlertaActiva({
+        tipo: "aglomeracion",
+        titulo: "Aglomeración alta",
+        descripcion: `${grupo} personas agrupadas en ${zona.toLowerCase()}`,
+      });
+
+      // Toast solo si el nivel CAMBIÓ a ALTO (no si ya estaba en ALTO)
+      if (nivelAnteriorRef.current !== "ALTO") {
+        agregarToast(
+          "Aglomeración detectada",
+          `Grupo de ${grupo} personas — Zona: ${zona}`,
+          "alto"
+        );
+      }
+    } else {
+      // Si bajó de ALTO a algo menor, quitar el banner
+      if (nivelAnteriorRef.current === "ALTO") {
+        setAlertaActiva(null);
+      }
+    }
+
+    nivelAnteriorRef.current = nuevoNivel;
+  };
+
+  const procesarAlertaSospechosa = (susp, detecciones) => {
+    const frameW = canvasRef.current?.width || 640;
+    const frameH = canvasRef.current?.height || 480;
+
+    if (susp > 0) {
+      const sospechososDetectados = (detecciones || []).filter(
+        (d) => d.es_sospechoso
+      );
+      const zona = obtenerZonaPromedio(sospechososDetectados, frameW, frameH);
+
+      setAlertaActiva({
+        tipo: "sospechosa",
+        titulo: "Actividad sospechosa",
+        descripcion: `${susp} persona${susp > 1 ? "s" : ""} sospechosa${
+          susp > 1 ? "s" : ""
+        } en ${zona.toLowerCase()}`,
+      });
+
+      // Debounce: solo dispara toast si pasaron al menos 2 segundos desde el último
+      const ahora = Date.now();
+      if (ahora - ultimaAlertaSospechosaRef.current > DEBOUNCE_SOSPECHOSA_MS) {
+        agregarToast(
+          "Actividad sospechosa detectada",
+          `${susp} persona${susp > 1 ? "s" : ""} — Zona: ${zona}`,
+          "sospechosa"
+        );
+        ultimaAlertaSospechosaRef.current = ahora;
+      }
+    } else {
+      // Si dejó de haber sospechosos, quitar el banner
+      setAlertaActiva(null);
+    }
+  };
+
+  // ============================================================
+  // ENVIAR FRAMES
   // ============================================================
   const enviarSiguienteFrame = () => {
     if (
@@ -176,7 +329,6 @@ export default function Realtime() {
     const ctx = canvas.getContext("2d");
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-    // Convertir a JPEG (calidad 0.7 para balance velocidad/calidad)
     canvas.toBlob(
       (blob) => {
         if (
@@ -187,7 +339,6 @@ export default function Realtime() {
           esperandoRespuestaRef.current = true;
           wsRef.current.send(blob);
 
-          // Timeout de seguridad: si el server no responde, reintentar
           setTimeout(() => {
             if (esperandoRespuestaRef.current) {
               esperandoRespuestaRef.current = false;
@@ -205,14 +356,12 @@ export default function Realtime() {
   // DETENER
   // ============================================================
   const cerrarTodo = () => {
-    // Cerrar WebSocket
     if (wsRef.current) {
       try {
         wsRef.current.close();
-      } catch { }
+      } catch {}
       wsRef.current = null;
     }
-    // Cerrar webcam
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
@@ -232,15 +381,14 @@ export default function Realtime() {
     setSospechosos(0);
     setGrupoMayor(0);
     setNivel("BAJO");
-
+    setAlertaActiva(null);
+    setToasts([]);
   };
 
   const cambiarModo = (nuevoId) => {
     setModoId(nuevoId);
-    // Si está activo, reiniciar con el nuevo modo
     if (activo) {
       detener();
-      // Esperar un tick para que limpie y reiniciar
       setTimeout(() => {
         setModoId(nuevoId);
         iniciar();
@@ -318,7 +466,6 @@ export default function Realtime() {
         </section>
       )}
 
-      {/* Video oculto (captura de webcam) y canvas oculto (para encodear frames) */}
       <video
         ref={videoRef}
         autoPlay
@@ -341,89 +488,161 @@ export default function Realtime() {
           </div>
 
           <div className="step-body">
-            <div className="realtime-stream">
-              {frameProcesado ? (
-                <img src={frameProcesado} alt="Detección en vivo" />
-              ) : (
-                <div className="realtime-placeholder">
-                  Esperando primer frame del servidor...
+            <div className="realtime-layout">
+              {/* Columna principal: video + stats + leyenda */}
+              <div className="realtime-main">
+                <div className="realtime-stream">
+                  {/* Banner de alerta persistente */}
+                  {alertaActiva && (
+                    <div className={`realtime-banner banner-${alertaActiva.tipo}`}>
+                      <div className="banner-icon">⚠</div>
+                      <div className="banner-content">
+                        <div className="banner-titulo">{alertaActiva.titulo}</div>
+                        <div className="banner-desc">{alertaActiva.descripcion}</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {frameProcesado ? (
+                    <img src={frameProcesado} alt="Detección en vivo" />
+                  ) : (
+                    <div className="realtime-placeholder">
+                      Esperando primer frame del servidor...
+                    </div>
+                  )}
+                  <div className="realtime-indicator">
+                    <span className="realtime-dot" />
+                    EN VIVO
+                  </div>
                 </div>
-              )}
-              <div className="realtime-indicator">
-                <span className="realtime-dot" />
-                EN VIVO
-              </div>
-            </div>
 
-            <div className="realtime-stats">
-              <div className="stat-card">
-                <div className="stat-label">FPS</div>
-                <div className="stat-value">{fps.toFixed(1)}</div>
-              </div>
-              <div className="stat-card">
-                <div className="stat-label">Personas</div>
-                <div className="stat-value">{totalPersonas}</div>
-              </div>
-
-              {modoId === "aglomeraciones" ? (
-                <>
+                <div className="realtime-stats">
                   <div className="stat-card">
-                    <div className="stat-label">Grupo mayor</div>
-                    <div className="stat-value">{grupoMayor}</div>
+                    <div className="stat-label">FPS</div>
+                    <div className="stat-value">{fps.toFixed(1)}</div>
                   </div>
-                  <div
-                    className={`stat-card ${
-                      nivel === "ALTO"
-                        ? "stat-alerta"
-                        : nivel === "MEDIO"
-                        ? "stat-medio"
-                        : ""
-                    }`}
-                  >
-                    <div className="stat-label">Nivel</div>
-                    <div className="stat-value">{nivel}</div>
+                  <div className="stat-card">
+                    <div className="stat-label">Personas</div>
+                    <div className="stat-value">{totalPersonas}</div>
                   </div>
-                </>
-              ) : (
-                <div
-                  className={`stat-card ${
-                    sospechosos > 0 ? "stat-alerta" : ""
-                  }`}
-                >
-                  <div className="stat-label">Sospechosos</div>
-                  <div className="stat-value">{sospechosos}</div>
-                </div>
-              )}
-            </div>
 
-            <div className="realtime-leyenda">
-              {modoId === "aglomeraciones" ? (
-                <>
-                  <span className="leyenda-item">
-                    <span className="leyenda-dot" style={{ background: "#00c850" }} />
-                    Verde: persona detectada
-                  </span>
-                  <span className="leyenda-item">
-                    <span className="leyenda-dot" style={{ background: "#ffeb3b" }} />
-                    Líneas amarillas: personas agrupadas
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span className="leyenda-item">
-                    <span className="leyenda-dot" style={{ background: "#00c850" }} />
-                    Verde: persona normal
-                  </span>
-                  <span className="leyenda-item">
-                    <span className="leyenda-dot" style={{ background: "#dc2626" }} />
-                    Rojo: persona sospechosa
-                  </span>
-                </>
-              )}
+                  {modoId === "aglomeraciones" ? (
+                    <>
+                      <div className="stat-card">
+                        <div className="stat-label">Grupo mayor</div>
+                        <div className="stat-value">{grupoMayor}</div>
+                      </div>
+                      <div
+                        className={`stat-card ${
+                          nivel === "ALTO"
+                            ? "stat-alerta"
+                            : nivel === "MEDIO"
+                            ? "stat-medio"
+                            : ""
+                        }`}
+                      >
+                        <div className="stat-label">Nivel</div>
+                        <div className="stat-value">{nivel}</div>
+                      </div>
+                    </>
+                  ) : (
+                    <div
+                      className={`stat-card ${
+                        sospechosos > 0 ? "stat-alerta" : ""
+                      }`}
+                    >
+                      <div className="stat-label">Sospechosos</div>
+                      <div className="stat-value">{sospechosos}</div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="realtime-leyenda">
+                  {modoId === "aglomeraciones" ? (
+                    <>
+                      <span className="leyenda-item">
+                        <span
+                          className="leyenda-dot"
+                          style={{ background: "#00c850" }}
+                        />
+                        Verde: persona detectada
+                      </span>
+                      <span className="leyenda-item">
+                        <span
+                          className="leyenda-dot"
+                          style={{ background: "#ffeb3b" }}
+                        />
+                        Líneas amarillas: personas agrupadas
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="leyenda-item">
+                        <span
+                          className="leyenda-dot"
+                          style={{ background: "#00c850" }}
+                        />
+                        Verde: persona normal
+                      </span>
+                      <span className="leyenda-item">
+                        <span
+                          className="leyenda-dot"
+                          style={{ background: "#dc2626" }}
+                        />
+                        Rojo: persona sospechosa
+                      </span>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* Columna lateral: historial de eventos */}
+              <aside className="realtime-historial">
+                <h3 className="historial-titulo">Historial de eventos</h3>
+                {historial.length === 0 ? (
+                  <p className="historial-vacio">
+                    Sin eventos detectados todavía.
+                  </p>
+                ) : (
+                  <ul className="historial-lista">
+                    {historial.map((ev) => (
+                      <li
+                        key={ev.id}
+                        className={`historial-item historial-${ev.tipo}`}
+                      >
+                        <div className="historial-hora">{ev.hora}</div>
+                        <div className="historial-titulo-ev">{ev.titulo}</div>
+                        <div className="historial-desc">{ev.descripcion}</div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </aside>
             </div>
           </div>
         </section>
       )}
+
+      {/* Toasts flotantes */}
+      <div className="toast-container">
+        {toasts.map((t) => (
+          <div key={t.id} className={`toast toast-${t.tipo}`}>
+            <div className="toast-icon">⚠</div>
+            <div className="toast-content">
+              <div className="toast-titulo">{t.titulo}</div>
+              <div className="toast-desc">{t.descripcion}</div>
+              <div className="toast-hora">{t.hora}</div>
+            </div>
+            <button
+              className="toast-cerrar"
+              onClick={() => limpiarToast(t.id)}
+              aria-label="Cerrar"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+      </div>
     </>
   );
 }

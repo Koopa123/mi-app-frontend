@@ -1,4 +1,20 @@
 /* ============================================================
+   LAYOUT GENERAL
+   ============================================================ */
+.realtime-layout {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .realtime-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================================
    STREAM EN VIVO
    ============================================================ */
 .realtime-stream {
@@ -39,6 +55,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  z-index: 2;
 }
 
 .realtime-dot {
@@ -52,6 +69,62 @@
 @keyframes pulse-realtime {
   0%, 100% { opacity: 1; transform: scale(1); }
   50% { opacity: 0.5; transform: scale(1.3); }
+}
+
+/* ============================================================
+   BANNER DE ALERTA PERSISTENTE
+   ============================================================ */
+.realtime-banner {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  right: 100px;
+  background: rgba(220, 38, 38, 0.95);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  padding: 10px 14px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 2;
+  animation: slide-down 0.3s ease-out;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.realtime-banner.banner-sospechosa {
+  background: rgba(220, 38, 38, 0.95);
+}
+
+.realtime-banner.banner-aglomeracion {
+  background: rgba(234, 88, 12, 0.95);
+}
+
+.banner-icon {
+  font-size: 22px;
+  flex-shrink: 0;
+}
+
+.banner-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.banner-titulo {
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.3px;
+}
+
+.banner-desc {
+  font-size: 12px;
+  opacity: 0.95;
+  margin-top: 2px;
+}
+
+@keyframes slide-down {
+  from { transform: translateY(-20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
 }
 
 /* ============================================================
@@ -95,6 +168,15 @@
   color: #dc2626;
 }
 
+.stat-card.stat-medio {
+  background: rgba(234, 179, 8, 0.08);
+  border-color: rgba(234, 179, 8, 0.3);
+}
+
+.stat-card.stat-medio .stat-value {
+  color: #ca8a04;
+}
+
 /* ============================================================
    LEYENDA
    ============================================================ */
@@ -124,11 +206,164 @@
   flex-shrink: 0;
 }
 
-.stat-card.stat-medio {
-  background: rgba(234, 179, 8, 0.08);
-  border-color: rgba(234, 179, 8, 0.3);
+/* ============================================================
+   HISTORIAL LATERAL
+   ============================================================ */
+.realtime-historial {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px;
+  position: sticky;
+  top: 20px;
 }
 
-.stat-card.stat-medio .stat-value {
-  color: #ca8a04;
+.historial-titulo {
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-soft);
+  margin: 0 0 14px;
+  font-weight: 600;
+}
+
+.historial-vacio {
+  font-size: 13px;
+  color: var(--text-soft);
+  font-style: italic;
+  margin: 0;
+}
+
+.historial-lista {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.historial-item {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.03);
+  border-left: 3px solid #dc2626;
+}
+
+.historial-item.historial-aglomeracion {
+  border-left-color: #ea580c;
+}
+
+.historial-hora {
+  font-size: 11px;
+  color: var(--text-soft);
+  font-family: monospace;
+  margin-bottom: 4px;
+}
+
+.historial-titulo-ev {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+
+.historial-desc {
+  font-size: 12px;
+  color: var(--text-soft);
+  line-height: 1.4;
+}
+
+/* ============================================================
+   TOASTS FLOTANTES
+   ============================================================ */
+.toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  background: #fff;
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 300px;
+  max-width: 380px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  border-left: 4px solid #dc2626;
+  animation: slide-in-right 0.3s ease-out;
+}
+
+.toast.toast-aglomeracion {
+  border-left-color: #ea580c;
+}
+
+.toast-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  color: #dc2626;
+}
+
+.toast.toast-aglomeracion .toast-icon {
+  color: #ea580c;
+}
+
+.toast-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.toast-titulo {
+  font-weight: 700;
+  font-size: 13px;
+  color: #111;
+  margin-bottom: 2px;
+}
+
+.toast-desc {
+  font-size: 12px;
+  color: #555;
+  line-height: 1.4;
+}
+
+.toast-hora {
+  font-size: 11px;
+  color: #888;
+  margin-top: 6px;
+  font-family: monospace;
+}
+
+.toast-cerrar {
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  color: #999;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.toast-cerrar:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #555;
+}
+
+@keyframes slide-in-right {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
 }
