@@ -3,7 +3,7 @@ import { REALTIME_URL, REALTIME_WS_URL } from "../services/api";
 import "../styles/realtime.css";
 
 const FRAME_TIMEOUT_MS = 5000;
-const DEBOUNCE_SOSPECHOSA_MS = 2000;   // No dispara nueva alerta sospechosa si hubo una hace menos de 2s
+const DEBOUNCE_SOSPECHOSA_MS = 2000;
 const TOAST_DURATION_MS = 5000;
 const MAX_HISTORIAL = 5;
 
