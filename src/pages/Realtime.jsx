@@ -7,6 +7,13 @@ const DEBOUNCE_SOSPECHOSA_MS = 2000;   // No dispara nueva alerta sospechosa si 
 const TOAST_DURATION_MS = 5000;
 const MAX_HISTORIAL = 5;
 
+// Límite de FPS para no saturar el WebSocket / GPU.
+// Con CPU, el modelo era el cuello de botella; con GPU rápida el cliente
+// dispararía cientos de FPS si no se le pone freno. 30 FPS es lo que da
+// la mayoría de webcams y es más que suficiente para detección.
+const FPS_OBJETIVO = 30;
+const INTERVALO_MIN_MS = 1000 / FPS_OBJETIVO;
+
 export default function Realtime() {
   const [modos, setModos] = useState([]);
   const [modoId, setModoId] = useState("");
@@ -33,6 +40,8 @@ export default function Realtime() {
   const wsRef = useRef(null);
   const streamRef = useRef(null);
   const esperandoRespuestaRef = useRef(false);
+  const ultimoEnvioRef = useRef(0);          // timestamp del último frame enviado (throttle)
+  const timeoutThrottleRef = useRef(null);   // para limpiar setTimeout pendiente al detener
 
   // Refs para debounce
   const nivelAnteriorRef = useRef("BAJO");
@@ -314,6 +323,19 @@ export default function Realtime() {
       return;
     }
 
+    // Throttle: si la GPU respondió muy rápido, no spammear el WS.
+    // Esperamos hasta completar 1000/FPS_OBJETIVO ms desde el último envío.
+    const ahora = Date.now();
+    const desdeUltimo = ahora - ultimoEnvioRef.current;
+    if (desdeUltimo < INTERVALO_MIN_MS) {
+      const restante = INTERVALO_MIN_MS - desdeUltimo;
+      timeoutThrottleRef.current = setTimeout(() => {
+        timeoutThrottleRef.current = null;
+        enviarSiguienteFrame();
+      }, restante);
+      return;
+    }
+
     const video = videoRef.current;
     const canvas = canvasRef.current;
     if (!video || !canvas || video.readyState < 2) return;
@@ -337,6 +359,7 @@ export default function Realtime() {
           wsRef.current.readyState === WebSocket.OPEN
         ) {
           esperandoRespuestaRef.current = true;
+          ultimoEnvioRef.current = Date.now();
           wsRef.current.send(blob);
 
           setTimeout(() => {
@@ -356,6 +379,11 @@ export default function Realtime() {
   // DETENER
   // ============================================================
   const cerrarTodo = () => {
+    // Limpiar throttle pendiente para no disparar un envío después de cerrar
+    if (timeoutThrottleRef.current) {
+      clearTimeout(timeoutThrottleRef.current);
+      timeoutThrottleRef.current = null;
+    }
     if (wsRef.current) {
       try {
         wsRef.current.close();
@@ -370,6 +398,7 @@ export default function Realtime() {
       videoRef.current.srcObject = null;
     }
     esperandoRespuestaRef.current = false;
+    ultimoEnvioRef.current = 0;
   };
 
   const detener = () => {
