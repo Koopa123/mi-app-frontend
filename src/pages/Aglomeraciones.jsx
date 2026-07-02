@@ -127,6 +127,10 @@ export default function Aglomeraciones() {
         body: formData,
       });
       const data = await res.json();
+      if (!res.ok) {
+        alert(data.detail || "Error iniciando el análisis");
+        return;
+      }
       setResultado(data);
     } finally {
       setCargandoAnalisis(false);
@@ -638,8 +642,8 @@ export default function Aglomeraciones() {
                       <td>{item.personas_maximas}</td>
                       <td>{item.grupo_mayor_maximo}</td>
                       <td>
-                        <span className={`badge ${item.nivel_final.toLowerCase()}`}>
-                          {item.nivel_final}
+                        <span className={`badge ${String(item.nivel_final || "").toLowerCase()}`}>
+                          {item.nivel_final || "—"}
                         </span>
                       </td>
                       <td>{new Date(item.fecha).toLocaleString()}</td>

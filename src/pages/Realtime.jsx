@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { REALTIME_URL, REALTIME_WS_URL } from "../services/api";
+import { apiFetch, getToken, REALTIME_URL, REALTIME_WS_URL } from "../services/api";
 import "../styles/realtime.css";
 
 const FRAME_TIMEOUT_MS = 5000;
@@ -39,6 +39,7 @@ export default function Realtime() {
   const canvasRef = useRef(null);
   const wsRef = useRef(null);
   const streamRef = useRef(null);
+  const montadoRef = useRef(true);
   const esperandoRespuestaRef = useRef(false);
   const ultimoEnvioRef = useRef(0);          // timestamp del último frame enviado (throttle)
   const timeoutThrottleRef = useRef(null);   // para limpiar setTimeout pendiente al detener
@@ -53,7 +54,7 @@ export default function Realtime() {
   useEffect(() => {
     const cargar = async () => {
       try {
-        const res = await fetch(`${REALTIME_URL}/modos`);
+        const res = await apiFetch(`${REALTIME_URL}/modos`);
         const data = await res.json();
         const disponibles = data.modos.filter((m) => m.disponible);
         setModos(disponibles);
@@ -67,8 +68,10 @@ export default function Realtime() {
       }
     };
     cargar();
+    montadoRef.current = true;
 
     return () => {
+      montadoRef.current = false;
       detener();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -164,6 +167,15 @@ export default function Realtime() {
         video: { width: 640, height: 480 },
         audio: false,
       });
+
+      // El componente pudo desmontarse mientras esperábamos el permiso de
+      // cámara (usuario cambió de pestaña). Si eso pasó, no dejamos la
+      // cámara ni abrimos un WebSocket huérfano: cerramos todo ya mismo.
+      if (!montadoRef.current) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
+
       streamRef.current = stream;
 
       if (videoRef.current) {
@@ -171,7 +183,9 @@ export default function Realtime() {
         await videoRef.current.play();
       }
 
-      const ws = new WebSocket(`${REALTIME_WS_URL}?modo=${modoId}`);
+      // El navegador no puede mandar headers en el handshake de un
+      // WebSocket, así que el token va como query param.
+      const ws = new WebSocket(`${REALTIME_WS_URL}?modo=${modoId}&token=${getToken()}`);
       wsRef.current = ws;
 
       ws.onopen = () => {

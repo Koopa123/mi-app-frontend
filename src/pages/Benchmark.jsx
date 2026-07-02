@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { BENCHMARK_URL } from "../services/api";
+import { apiFetch, BENCHMARK_URL, getToken } from "../services/api";
 import Check from "../components/Check";
 import "../styles/benchmark.css";
 
@@ -46,7 +46,7 @@ export default function Benchmark() {
   useEffect(() => {
     const cargar = async () => {
       try {
-        const res = await fetch(`${BENCHMARK_URL}/videos-demo`);
+        const res = await apiFetch(`${BENCHMARK_URL}/videos-demo`);
         const data = await res.json();
         setVideosDemo(data.videos || []);
         if (data.videos && data.videos.length > 0) {
@@ -166,7 +166,7 @@ export default function Benchmark() {
       let res;
       if (fuenteVideo === "demo") {
         // Usar un video demo
-        res = await fetch(`${BENCHMARK_URL}/sesion/iniciar-demo`, {
+        res = await apiFetch(`${BENCHMARK_URL}/sesion/iniciar-demo`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ demo_id: demoSeleccionadoId }),
@@ -175,7 +175,7 @@ export default function Benchmark() {
         // Subir el video
         const formData = new FormData();
         formData.append("file", archivo);
-        res = await fetch(`${BENCHMARK_URL}/sesion/iniciar`, {
+        res = await apiFetch(`${BENCHMARK_URL}/sesion/iniciar`, {
           method: "POST",
           body: formData,
         });
@@ -199,7 +199,9 @@ export default function Benchmark() {
         let data;
 
         if (MODELOS_VISUALES.has(modeloId)) {
-          const urlVisual = `${BENCHMARK_URL}/sesion/${sid}/stream/${modeloId}?t=${Date.now()}`;
+          // <img src> no puede mandar el header Authorization: el token va
+          // como query param.
+          const urlVisual = `${BENCHMARK_URL}/sesion/${sid}/stream/${modeloId}?t=${Date.now()}&token=${getToken()}`;
           setStreamUrl(urlVisual);
 
           await sleep(500);
@@ -210,7 +212,7 @@ export default function Benchmark() {
             intervalosValidos
           );
         } else {
-          const res = await fetch(
+          const res = await apiFetch(
             `${BENCHMARK_URL}/sesion/${sid}/correr/${modeloId}`,
             {
               method: "POST",
@@ -237,7 +239,7 @@ export default function Benchmark() {
     setStreamUrl(null);
 
     try {
-      await fetch(`${BENCHMARK_URL}/sesion/${sid}`, { method: "DELETE" });
+      await apiFetch(`${BENCHMARK_URL}/sesion/${sid}`, { method: "DELETE" });
     } catch { }
 
     setModeloActual(null);
@@ -247,7 +249,7 @@ export default function Benchmark() {
   const reiniciar = async () => {
     if (sessionId) {
       try {
-        await fetch(`${BENCHMARK_URL}/sesion/${sessionId}`, { method: "DELETE" });
+        await apiFetch(`${BENCHMARK_URL}/sesion/${sessionId}`, { method: "DELETE" });
       } catch { }
     }
 
@@ -277,7 +279,7 @@ export default function Benchmark() {
     const maxIntentos = 720;
 
     for (let intento = 0; intento < maxIntentos; intento++) {
-      const res = await fetch(
+      const res = await apiFetch(
         `${BENCHMARK_URL}/sesion/${sid}/resultado-stream/${modeloId}`,
         {
           method: "POST",
@@ -461,7 +463,7 @@ export default function Benchmark() {
                       {demoActual && (
                         <div className="video-preview">
                           <video
-                            src={`${BENCHMARK_URL}/sesion-preview-demo?demo_id=${demoActual.id}`}
+                            src={`${BENCHMARK_URL}/sesion-preview-demo?demo_id=${demoActual.id}&token=${getToken()}`}
                             controls
                             onLoadedMetadata={onMetadataVideo}
                           />

@@ -6,6 +6,15 @@ const REALTIME_WS_URL = import.meta.env.VITE_REALTIME_WS_URL;
 export { API_URL, BENCHMARK_URL, REALTIME_URL, REALTIME_WS_URL };
 
 /**
+ * Token JWT actual, para los pocos casos (WebSocket, <img>/<video src>)
+ * que no pueden mandar un header Authorization y necesitan pasarlo como
+ * query param.
+ */
+export function getToken() {
+  return localStorage.getItem("token");
+}
+
+/**
  * Hace fetch a una URL agregando automáticamente el token JWT.
  * Si la respuesta es 401, dispara un evento "auth-expired" para que
  * el AuthContext haga logout automático.
